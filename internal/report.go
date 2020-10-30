@@ -2,10 +2,18 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 
-	"github.com/google/go-github/v32/github"
 	"github.com/spf13/viper"
+)
+
+type GitHubLogLevel string
+
+const (
+	GitHubLogLevelDebug   GitHubLogLevel = "debug"
+	GitHubLogLevelWarning GitHubLogLevel = "warning"
+	GitHubLogLevelError   GitHubLogLevel = "error"
 )
 
 type Report struct {
@@ -24,12 +32,12 @@ type Report struct {
 	Errors []string `json:"errors"`
 }
 
-func (r *Report) CreateCheckRunAnnotations() ([]*github.CheckRunAnnotation, error) {
+func (r *Report) CreateMessages() ([]string, error) {
 	if !viper.IsSet("github.workspace") {
 		return nil, errors.New("missing config key: github.workspace")
 	}
 
-	var as []*github.CheckRunAnnotation
+	var ms []string
 	for k, v := range r.Files {
 		for _, m := range v.Messages {
 			p, err := filepath.Rel(viper.GetString("github.workspace"), k)
@@ -37,17 +45,18 @@ func (r *Report) CreateCheckRunAnnotations() ([]*github.CheckRunAnnotation, erro
 				return nil, err
 			}
 
-			a := &github.CheckRunAnnotation{
-				Path:            github.String(p),
-				StartLine:       github.Int(m.Line),
-				EndLine:         github.Int(m.Line),
-				AnnotationLevel: github.String("failure"),
-				Message:         github.String(m.Message),
-			}
-
-			as = append(as, a)
+			ms = append(
+				ms,
+				fmt.Sprintf(
+					"::%s file=%s,line=%d::%s",
+					GitHubLogLevelError,
+					p,
+					m.Line,
+					m.Message,
+				),
+			)
 		}
 	}
 
-	return as, nil
+	return ms, nil
 }
