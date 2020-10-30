@@ -21,15 +21,8 @@ type Report struct {
 		Errors     int `json:"errors"`
 		FileErrors int `json:"file_errors"`
 	} `json:"totals"`
-	Files map[string]struct {
-		Errors   int `json:"errors"`
-		Messages []struct {
-			Message   string `json:"message"`
-			Line      int    `json:"line"`
-			Ignorable bool   `json:"ignorable"`
-		} `json:"messages"`
-	} `json:"files"`
-	Errors []string `json:"errors"`
+	Files  interface{} `json:"files"`
+	Errors interface{} `json:"errors"`
 }
 
 func (r *Report) CreateMessages() ([]string, error) {
@@ -37,8 +30,25 @@ func (r *Report) CreateMessages() ([]string, error) {
 		return nil, errors.New("missing config key: github.workspace")
 	}
 
+	fs, ok := r.Files.(map[string]struct {
+		Errors   int `json:"errors"`
+		Messages []struct {
+			Message   string `json:"message"`
+			Line      int    `json:"line"`
+			Ignorable bool   `json:"ignorable"`
+		} `json:"messages"`
+	})
+
+	if !ok {
+		if _, ok := r.Files.([]interface{}); ok {
+			return nil, nil
+		}
+
+		return nil, errors.New("invalid report")
+	}
+
 	var ms []string
-	for k, v := range r.Files {
+	for k, v := range fs {
 		for _, m := range v.Messages {
 			p, err := filepath.Rel(viper.GetString("github.workspace"), k)
 			if err != nil {
