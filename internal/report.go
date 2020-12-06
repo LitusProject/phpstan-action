@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -74,7 +75,7 @@ func (r *Report) CreateMessages() ([]string, error) {
 					GitHubLogLevelError,
 					p,
 					m.Line,
-					m.Message,
+					strings.ReplaceAll(m.Message, "\n", "%0A"),
 				),
 			)
 		}
