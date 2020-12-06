@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -21,8 +22,36 @@ type Report struct {
 		Errors     int `json:"errors"`
 		FileErrors int `json:"file_errors"`
 	} `json:"totals"`
-	Files  interface{} `json:"files"`
-	Errors interface{} `json:"errors"`
+	Files map[string]struct {
+		Errors   int `json:"errors"`
+		Messages []struct {
+			Message   string `json:"message"`
+			Line      int    `json:"line"`
+			Ignorable bool   `json:"ignorable"`
+		} `json:"messages"`
+	} `json:"files"`
+	Errors []string `json:"errors"`
+}
+
+func (r *Report) UnmarshalJSON(data []byte) error {
+	type Alias Report
+
+	if err := json.Unmarshal(data, (*Alias)(r)); err != nil {
+		a := &struct {
+			Files []string `json:"files"`
+			*Alias
+		}{
+			Alias: (*Alias)(r),
+		}
+
+		if err := json.Unmarshal(data, &a); err != nil {
+			return err
+		}
+
+		r.Files = nil
+	}
+
+	return nil
 }
 
 func (r *Report) CreateMessages() ([]string, error) {
@@ -30,25 +59,8 @@ func (r *Report) CreateMessages() ([]string, error) {
 		return nil, errors.New("missing config key: github.workspace")
 	}
 
-	fs, ok := r.Files.(map[string]struct {
-		Errors   int `json:"errors"`
-		Messages []struct {
-			Message   string `json:"message"`
-			Line      int    `json:"line"`
-			Ignorable bool   `json:"ignorable"`
-		} `json:"messages"`
-	})
-
-	if !ok {
-		if _, ok := r.Files.([]interface{}); ok {
-			return nil, nil
-		}
-
-		return nil, errors.New("invalid report")
-	}
-
 	var ms []string
-	for k, v := range fs {
+	for k, v := range r.Files {
 		for _, m := range v.Messages {
 			p, err := filepath.Rel(viper.GetString("github.workspace"), k)
 			if err != nil {
