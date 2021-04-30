@@ -10,7 +10,7 @@ ENV CGO_ENABLED=0
 RUN go get -d -v ./... && \
   go install -v ./...
 
-FROM litusproject/phpstan:latest AS phpstan
+FROM ghcr.io/litusproject/phpstan:latest AS phpstan
 
 COPY --from=golang /go/bin/phpstan-action /usr/bin/
 
